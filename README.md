@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 # BlindTest Generator
  Just a small software that generates Blind Test with your local tracks, ideal to train !
 
@@ -63,4 +62,3 @@ python build.py
 ```
 
 L'exécutable sera créé dans le dossier `dist/`.
->>>>>>> Stashed changes
