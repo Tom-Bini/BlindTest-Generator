@@ -9,18 +9,29 @@ from mutagen.id3 import ID3
 def load_font():
     # Chemin vers le dossier des polices dans Windows
     font_path = os.path.join(os.environ['WINDIR'], 'Fonts')
-    montserrat_fonts = {
-        'regular': 'Montserrat-Regular.ttf',
-        'bold': 'Montserrat-Bold.ttf',
-        'medium': 'Montserrat-Medium.ttf'
+    roboto_fonts = {
+        'regular': 'Roboto-Regular.ttf',
+        'bold': 'Roboto-Bold.ttf',
+        'medium': 'Roboto-Medium.ttf'
     }
     
-    # Vérifier si Montserrat est déjà installé
+    # Vérifier si Roboto est déjà installé
     available_fonts = [f.lower() for f in font.families()]
-    if 'montserrat' in available_fonts:
-        return 'Montserrat'
+    if 'roboto' in available_fonts:
+        return 'Roboto'
         
-    return 'Helvetica'  # Police de fallback si Montserrat n'est pas disponible
+    return 'Helvetica'  # Police de fallback si Roboto n'est pas disponible
+
+def load_title_font():
+    # Vérifier si Luckiest Guy est déjà installé
+    available_fonts = [f.lower() for f in font.families()]
+    if 'luckiest guy' in available_fonts:
+        return 'Luckiest Guy'
+    else:
+        print("La police Luckiest Guy n'est pas installée sur votre système.")
+        print("Veuillez l'installer depuis Google Fonts : https://fonts.google.com/specimen/Luckiest+Guy")
+        
+    return 'Arial'  # Police de fallback si Luckiest Guy n'est pas disponible
 
 def get_metadata(file_path):
     try:

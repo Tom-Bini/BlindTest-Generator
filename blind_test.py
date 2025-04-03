@@ -15,7 +15,7 @@ import math
 import ctypes
 
 from buttons import CircleButton, RoundedButton
-from utils import load_font, get_metadata, get_file_info
+from utils import load_font, load_title_font, get_metadata, get_file_info
 from config import Config
 
 class BlindTest:
@@ -25,10 +25,16 @@ class BlindTest:
         
         # Définir l'ID de l'application pour Windows
         try:
-            myappid = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.ico")
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.ico")
+            # Définir l'ID unique de l'application
+            myappid = "com.blindtest.app"
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+            # Charger et appliquer l'icône
+            self.root.iconbitmap(default=icon_path)
+            # Forcer l'icône pour la barre des tâches
+            self.root.tk.call('wm', 'iconphoto', self.root._w, tk.PhotoImage(file=icon_path.replace('.ico', '.png')))
         except Exception as e:
-            print(f"Erreur lors de la définition de l'AppUserModelID: {str(e)}")
+            print(f"Erreur lors de la définition de l'icône: {str(e)}")
             
         self.root.title("Blind Test Musical")
         self.root.geometry("994x700")
@@ -44,6 +50,7 @@ class BlindTest:
         
         # Charger la police
         self.font_family = load_font()
+        self.title_font = load_title_font()
         
         # Initialisation de pygame mixer
         pygame.mixer.init()
@@ -67,8 +74,8 @@ class BlindTest:
         self.current_thread = None
         self.selected_genre = tk.StringVar(value="Tous les genres")
         
-        # Variable pour la durée de l'extrait
-        self.selected_duration = tk.IntVar(value=5)
+        # Variables pour la durée de l'extrait
+        self.selected_duration = tk.IntVar(value=4)  # Index par défaut (5 secondes)
         
         # Variables pour la lecture complète
         self.is_full_song = False
@@ -101,6 +108,7 @@ class BlindTest:
         self.load_music_files()
 
     def choose_music_directory(self):
+        """Ouvre une boîte de dialogue pour choisir le dossier de musique"""
         directory = filedialog.askdirectory(
             title="Choisir le dossier contenant les musiques",
             initialdir=self.config.music_dir
@@ -110,6 +118,11 @@ class BlindTest:
             self.config.save_config()
             self.load_music_files()
 
+    def toggle_play_pause(self):
+        """Démarre la lecture de la musique"""
+        if not self.is_playing:
+            self.play_song()
+
     def create_interface(self):
         # Frame principale
         main_frame = tk.Frame(self.root, bg='#121212')
@@ -118,20 +131,46 @@ class BlindTest:
         # Frame pour le contenu principal
         self.content_main_frame = tk.Frame(main_frame, bg='#121212')
         self.content_main_frame.pack(fill='both', expand=True)
-        self.content_main_frame.grid_rowconfigure(0, weight=1)  # Permettre l'expansion verticale
+        self.content_main_frame.grid_rowconfigure(0, weight=1)
         
         # Barre latérale gauche avec coins arrondis à droite
         sidebar = tk.Frame(self.content_main_frame, bg='#000000', width=300)
-        sidebar.grid(row=0, column=0, sticky='nsew')  # nsew pour remplir dans toutes les directions
+        sidebar.grid(row=0, column=0, sticky='nsew')
         sidebar.grid_propagate(False)
         
-        # Logo
-        logo_label = tk.Label(sidebar,
-                            text="BLIND TEST",
-                            font=(self.font_family, 36, 'bold'),
-                            fg='#1DB954',
-                            bg='#000000')
-        logo_label.pack(pady=50)
+        # Frame pour le logo et le titre
+        logo_frame = tk.Frame(sidebar, bg='#000000')
+        logo_frame.pack(pady=30)
+        
+        # Charger et afficher le logo
+        try:
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo.png")
+            logo_image = Image.open(logo_path)
+            # Redimensionner le logo à une taille appropriée (par exemple 40x40)
+            logo_image = logo_image.resize((40, 40), Image.Resampling.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            logo_label = tk.Label(logo_frame,
+                                image=logo_photo,
+                                bg='#000000')
+            logo_label.image = logo_photo  # Garder une référence
+            logo_label.pack(side='left', padx=(0, 10))
+        except Exception as e:
+            print(f"Erreur lors du chargement du logo: {str(e)}")
+            # En cas d'erreur, afficher un symbole de musique
+            logo_label = tk.Label(logo_frame,
+                                text="♪",
+                                font=(self.font_family, 36),
+                                fg='#1DB954',
+                                bg='#000000')
+            logo_label.pack(side='left', padx=(0, 10))
+        
+        # Titre
+        title_label = tk.Label(logo_frame,
+                             text="BLIND TEST",
+                             font=(self.title_font, 36, 'bold'),
+                             fg='#1DB954',
+                             bg='#000000')
+        title_label.pack(side='left')
         
         # Séparateur horizontal
         separator = tk.Frame(sidebar, bg='#404040', height=1, width=200)
@@ -157,7 +196,7 @@ class BlindTest:
         # Afficher le chemin actuel
         self.path_label = tk.Label(genre_frame,
                                  text=f"Dossier : {os.path.basename(self.config.music_dir)}",
-                                 font=(self.font_family, 10),
+                                 font=(self.font_family, 12),
                                  fg='#B3B3B3',
                                  bg='#000000',
                                  wraplength=200)
@@ -172,7 +211,7 @@ class BlindTest:
                              font=(self.font_family, 16, 'bold'),
                              fg='white',
                              bg='#000000')
-        genre_label.pack(anchor='w')
+        genre_label.pack(anchor='center', pady=15)
         
         self.genre_menu = ttk.Combobox(genre_frame,
                                      textvariable=self.selected_genre,
@@ -204,16 +243,37 @@ class BlindTest:
                                 font=(self.font_family, 16, 'bold'),
                                 fg='white',
                                 bg='#000000')
-        duration_label.pack(anchor='w', pady=(15, 0))
+        duration_label.pack(anchor='center', pady=(15, 0))
         
-        self.duration_menu = ttk.Combobox(genre_frame,
-                                        textvariable=self.selected_duration,
-                                        state='readonly',
-                                        width=25,
-                                        font=(self.font_family, 14),
-                                        values=[0.1, 0.5, 1, 2, 5, 10, 15, 20, 30])
-        self.duration_menu.pack(pady=15)
-        self.duration_menu.set(5)  # Valeur par défaut
+        # Frame pour le slider de durée
+        duration_slider_frame = tk.Frame(genre_frame, bg='#000000')
+        duration_slider_frame.pack(fill='x', pady=15)
+        
+        # Valeurs possibles pour la durée
+        self.duration_values = [0.1, 0.5, 1, 2, 5, 10, 15, 20, 30]
+        
+        # Créer le slider de durée
+        self.duration_slider = ttk.Scale(duration_slider_frame,
+                                       from_=0,
+                                       to=8,  # 9 valeurs (0 à 8)
+                                       orient='horizontal',
+                                       variable=self.selected_duration,
+                                       command=self.update_duration,
+                                       style='Spotify.Horizontal.TScale',
+                                       length=200)
+        self.duration_slider.pack(fill='x')
+        
+        # Label pour afficher la valeur actuelle
+        self.duration_value_label = tk.Label(duration_slider_frame,
+                                           text="5 s",
+                                           font=(self.font_family, 12),
+                                           fg='#B3B3B3',
+                                           bg='#000000')
+        self.duration_value_label.pack(pady=(5, 0))
+        
+        # Définir la valeur par défaut (5 secondes = index 4)
+        self.duration_slider.set(4)
+        self.selected_duration.set(4)
         
         # Zone principale
         content_frame = tk.Frame(self.content_main_frame, bg='#121212')
@@ -241,11 +301,11 @@ class BlindTest:
         # Label pour le décompte (initialement caché)
         self.countdown_label = tk.Label(self.cover_frame,
                                       text="",
-                                      font=(self.font_family, 120, 'bold'),
+                                      font=(self.title_font, 120, 'bold'),
                                       fg='#1DB954',
                                       bg='#282828',
-                                      width=1,  # Retirer la largeur fixe
-                                      height=1)  # Retirer la hauteur fixe
+                                      width=1,
+                                      height=1)
         
         # Frame pour contenir le décompte avec la même taille que la pochette
         self.countdown_container = tk.Frame(self.cover_frame,
@@ -256,7 +316,7 @@ class BlindTest:
         # Label pour le décompte dans le container
         self.countdown_label = tk.Label(self.countdown_container,
                                       text="",
-                                      font=(self.font_family, 120, 'bold'),
+                                      font=(self.title_font, 120, 'bold'),
                                       fg='#1DB954',
                                       bg='#282828')
         self.countdown_label.place(relx=0.5, rely=0.5, anchor='center')
@@ -268,11 +328,11 @@ class BlindTest:
         # Zone de réponse avec hauteur fixe
         answer_frame = tk.Frame(content_frame, 
                               bg='#121212',
-                              width=600,  # Largeur fixe
-                              height=60)  # Hauteur fixe réduite
+                              width=600,
+                              height=60)
         answer_frame.grid(row=2, column=0, pady=10)
-        answer_frame.grid_propagate(False)  # Empêcher le redimensionnement automatique
-        answer_frame.grid_columnconfigure(0, weight=1)  # Centrer le contenu
+        answer_frame.grid_propagate(False)
+        answer_frame.grid_columnconfigure(0, weight=1)
         
         self.answer_label = tk.Label(answer_frame,
                                    text="Cliquez sur Play pour commencer !",
@@ -280,8 +340,8 @@ class BlindTest:
                                    fg='#B3B3B3',
                                    bg='#121212',
                                    justify='center',
-                                   wraplength=580)  # Légèrement moins que la largeur du frame
-        self.answer_label.grid(row=0, column=0)  # Utiliser grid au lieu de place
+                                   wraplength=580)
+        self.answer_label.grid(row=0, column=0)
         
         # Frame pour les contrôles
         control_frame = tk.Frame(content_frame, bg='#121212')
@@ -365,29 +425,6 @@ class BlindTest:
                                        bg='#121212')
         self.songs_left_label.pack()
 
-    def update_progress(self, value):
-        if self.is_playing and self.duration > 0:
-            try:
-                position = float(value) * self.duration / 100
-                pygame.mixer.music.set_pos(position)
-            except:
-                pass
-                
-    def update_progress_bar(self):
-        while self.is_playing and pygame.mixer.music.get_busy():
-            try:
-                pos = pygame.mixer.music.get_pos() / 1000  # Conversion en secondes
-                if pos > 0 and self.duration > 0:
-                    progress = (pos / self.duration) * 100
-                    self.progress_var.set(progress)
-            except:
-                pass
-            time.sleep(0.1)
-            
-    def toggle_play_pause(self):
-        if not self.is_playing:
-            self.play_song()
-            
     def play_song(self):
         # Si on est en mode "?" (l'extrait a déjà été joué), on rejoue l'extrait
         if self.countdown_label.cget('text') == "?":
@@ -405,21 +442,15 @@ class BlindTest:
         self.is_playing = True
         self.is_full_song = False
         
-        # Sauvegarder la position de départ pour pouvoir rejouer l'extrait
-        extract_duration = self.selected_duration.get()
-        max_start_position = max(0, self.duration - extract_duration - 5)
-        if max_start_position > 0:
-            self.current_start_position = random.uniform(0, max_start_position)
-        else:
-            self.current_start_position = 0
-        
         # Effacer la réponse précédente
         self.answer_label.config(text="")
         
         # Cacher la pochette et afficher le décompte
         self.album_cover_label.place_forget()
+        self.default_cover.place_forget()
+        self.music_icon.place_forget()
         self.countdown_container.place(relx=0.5, rely=0.5, anchor='center')
-        self.countdown_label.config(text=str(self.selected_duration.get()))
+        self.countdown_label.config(text=str(self.duration_values[self.selected_duration.get()]))
         
         # Désactiver les boutons pendant la lecture
         self.listen_more_button.config(state='disabled')
@@ -433,10 +464,18 @@ class BlindTest:
         # Réinitialiser la barre de progression
         self.progress_var.set(0)
         
-        # Récupérer la durée de la chanson et démarrer la lecture
+        # Récupérer la durée de la chanson
         try:
             audio = File(self.current_song)
             self.duration = audio.info.length
+            
+            # Calculer la position de départ aléatoire
+            extract_duration = self.duration_values[self.selected_duration.get()]
+            max_start_position = max(0, self.duration - extract_duration - 5)
+            if max_start_position > 0:
+                self.current_start_position = random.uniform(0, max_start_position)
+            else:
+                self.current_start_position = 0
             
             # Lecture de la musique
             pygame.mixer.music.load(self.current_song)
@@ -446,6 +485,7 @@ class BlindTest:
         except Exception as e:
             print(f"Erreur lors du chargement de la musique: {str(e)}")
             self.duration = 0
+            self.current_start_position = 0
             pygame.mixer.music.load(self.current_song)
             pygame.mixer.music.play()
         
@@ -466,7 +506,7 @@ class BlindTest:
         
         # Réinitialiser le décompte
         self.countdown_container.place(relx=0.5, rely=0.5, anchor='center')
-        self.countdown_label.config(text=str(self.selected_duration.get()))
+        self.countdown_label.config(text=str(self.duration_values[self.selected_duration.get()]))
         
         # Désactiver les boutons pendant la lecture
         self.listen_more_button.config(state='disabled')
@@ -491,7 +531,7 @@ class BlindTest:
         self.extract_thread.start()
 
     def update_countdown(self):
-        extract_duration = self.selected_duration.get()
+        extract_duration = self.duration_values[self.selected_duration.get()]
         # Pour les durées inférieures à 1 seconde, pas besoin de décompte
         if extract_duration < 1:
             if self.is_playing:
@@ -507,7 +547,7 @@ class BlindTest:
             time.sleep(1)
             
     def stop_after_delay(self):
-        extract_duration = self.selected_duration.get()
+        extract_duration = self.duration_values[self.selected_duration.get()]
         time.sleep(extract_duration)
         if self.is_playing and not self.is_full_song:
             pygame.mixer.music.stop()
@@ -515,7 +555,7 @@ class BlindTest:
             time.sleep(0.5)
             
             # Afficher le "?" à la place du décompte
-            self.countdown_label.config(text="?", font=(self.font_family, 80, 'bold'))
+            self.countdown_label.config(text="?", font=(self.title_font, 80, 'bold'))
             
             # Réactiver le bouton play et le bouton œil
             self.play_button.config(state='normal')
@@ -756,6 +796,15 @@ class BlindTest:
             
         except Exception as e:
             print(f"Erreur lors du chargement des fichiers : {str(e)}")
+
+    def update_duration(self, value):
+        try:
+            index = int(float(value))
+            if 0 <= index < len(self.duration_values):
+                self.selected_duration.set(index)
+                self.duration_value_label.config(text=f"{self.duration_values[index]} s")
+        except:
+            pass
 
 if __name__ == "__main__":
     root = tk.Tk()
